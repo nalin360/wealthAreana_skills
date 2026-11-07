@@ -1,0 +1,17 @@
+{
+  "$schema": "https://agentskills.io/schema/manifest.json",
+  "name": "wealtharena-skills",
+  "version": "1.0.0",
+  "description": "Official agent skills repository for Wealth Arena CLI, market analysis, and quantitative trading",
+  "homepage": "https://wealtharena.in",
+  "license": "Apache-2.0",
+  "skills": [
+    {
+      "name": "wealtharena-cli",
+      "displayName": "Wealth Arena CLI (wac)",
+      "description": "Use the Wealth Arena CLI (wac/wa) for Indian financial markets (NSE/BSE): live quotes, Option Chain with Greeks, GEX gamma flips, algorithmic backtests, paper trading, and quota usage.",
+      "path": "skills/wealtharena-cli/SKILL.md",
+      "aliases": ["wa", "wac", "wealtharena"]
+    }
+  ]
+}
