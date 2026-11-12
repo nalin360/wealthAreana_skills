@@ -36,7 +36,7 @@ Every authenticated API request consumes credits based on backend compute cost. 
 
 | Credit Weight | API & CLI Category | Representative Commands |
 |:---|:---|:---|
-| **0 Credits** | Control Plane & Quota | `wac login`, `wac logout`, `wac usage`, `wac plans`, `wac flags list`, `wac skill` |
+| **0 Credits** | Control Plane & Reachability | `wac conn` (alias `wac status`), `wac login`, `wac logout`, `wac usage`, `wac plans`, `wac flags list`, `wac skill` |
 | **1 Credit** | Lightweight Lookups | `wac market quote`, `wac market depth`, `wac me`, `wac broker status`, `wac market search` |
 | **5 Credits** | Analytical Compute | `wac chain snapshot`, `wac market history`, Pre-Open Gap analysis |
 | **10 Credits** | Bulk Analytics | Bulk multi-strike scans, Call vs Put OI time-series analysis |
@@ -47,6 +47,10 @@ Every authenticated API request consumes credits based on backend compute cost. 
 ## 3. High-Frequency Command Recipes
 
 ```bash
+# 0. Check Server Liveness & Reachability (Public /health, no login, 0 credits)
+wac conn
+# (alias: wac status)
+
 # 1. Check Remaining Compute Credits & Cycle Pacing
 wac usage
 
@@ -80,17 +84,24 @@ wac plans
 
 ---
 
-## 4. Exit Codes & Error Recovery
+## 4. Exit Codes, Error Catalog & Diagnostics
+
+### Format Contract: Sanitized `--md` vs Verbatim `--json`
+
+- **`--md` (Default for Humans & AI Agents)**: Sanitized presentation layer. Strips raw payload braces, redacts sensitive bearer tokens/credentials, intercepts internal stack traces and database errors, and renders safe GitHub-style markdown alert cards with an actionable remediation and a support handle (`Reference: req_...`).
+- **`--json` (Verbatim for Pipelines & JQ)**: Strictly verbatim by contract. Returns the exact raw HTTP status and structured error envelope without modification so machine consumers can inspect `error_code`, `status_code`, and `metadata`. (When `--ai` or `--actor` is set, success envelopes drop top-level `status` and `message` to conserve context, while error envelopes remain completely verbatim).
+
+### Process Exit Codes & Recovery
 
 The CLI communicates execution states deterministically via standard process exit codes:
 
-| Exit Code | Classification | Meaning & Recommended Agent Recovery |
-|:---:|:---|:---|
-| **0** | `SUCCESS` | Command completed successfully. Read output from stdout. |
-| **2** | `USAGE_ERROR` | Invalid command syntax, unrecognized flags, or mutually exclusive flags (`--md` and `--json` passed together). |
-| **4** | `AUTH_REQUIRED` | Missing or expired token. Recovery: Run `wac login`, set `WA_ACCESS_TOKEN`, or pass `--token <jwt>` in-memory. |
-| **5** | `RATE_LIMITED` | Request throttled by burst/sliding rate limiters. Recovery: Sleep for interval specified in `Retry-After` header. |
-| **6** | `SERVICE_OUTAGE` | Broker disconnected, billing store unavailable, or platform off-hours (platform operating window: 06:00–23:30 IST daily). Never fabricate synthetic numbers on exit 6. |
-| **7** | `GATE_REFUSED` | Feature flag killed (`kill:*`), live gate refusal without `--live --yes`, or emergency trading halt active (`wa halt`). |
-| **8** | `QUOTA_EXHAUSTED` | Monthly compute credits exhausted (`HTTP 402 QUOTA_EXHAUSTED`) or plan past due. Recovery: Inspect remaining balance with `wac usage`. |
-| **1** | `GENERIC_ERROR` | Internal server or network transport error. |
+| Exit Code | Classification | Representative Codes | Meaning & Recommended Agent Recovery |
+|:---:|:---|:---|:---|
+| **0** | `SUCCESS` | `OK` | Command completed successfully. Read output from stdout. |
+| **2** | `USAGE_ERROR` | `BAD_REQUEST`, syntax | Invalid command syntax, unrecognized flags, or mutually exclusive flags (`--md` and `--json` passed together). |
+| **4** | `AUTH_REQUIRED` | `UNAUTHORIZED`, `FORBIDDEN` | Missing or expired token. Recovery: Run `wac login`, set `WA_ACCESS_TOKEN`, or pass `--token <jwt>` in-memory. |
+| **5** | `RATE_LIMITED` | `TOO_MANY_REQUESTS` | Request throttled by burst/sliding rate limiters. Recovery: Sleep for interval specified in `Retry-After` header. |
+| **6** | `SERVICE_OUTAGE` | `SERVER_UNREACHABLE`, `SERVER_OFF_HOURS`, `SERVER_MAINTENANCE`, `BROKER_NOT_CONNECTED` | Server unreachable (`wac conn`), broker disconnected, or platform off-hours (operating window: 06:30–23:30 IST daily). Never fabricate synthetic numbers on exit 6. |
+| **7** | `GATE_REFUSED` | `FLAG_DISABLED`, `HALT_ACTIVE` | Feature flag killed (`kill:*`), live gate refusal without `--live --yes`, or emergency trading halt active (`wa halt`). |
+| **8** | `QUOTA_EXHAUSTED` | `QUOTA_EXHAUSTED`, `BILLING_PAST_DUE` | Monthly compute credits exhausted (`HTTP 402 QUOTA_EXHAUSTED`) or plan past due. Recovery: Inspect remaining balance with `wac usage`. |
+| **1** | `GENERIC_ERROR` | `INTERNAL_SERVER_ERROR` | Internal server or network transport error. Quote the `Reference: req_...` handle when seeking support. |

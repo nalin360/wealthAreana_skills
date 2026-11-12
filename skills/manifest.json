@@ -12,6 +12,13 @@
       "description": "Use the Wealth Arena CLI (wac/wa) for Indian financial markets (NSE/BSE): live quotes, Option Chain with Greeks, GEX gamma flips, algorithmic backtests, paper trading, and quota usage.",
       "path": "skills/wealtharena-cli/SKILL.md",
       "aliases": ["wa", "wac", "wealtharena"]
+    },
+    {
+      "name": "wealtharena-mcp",
+      "displayName": "Wealth Arena MCP Tools",
+      "description": "Use Wealth Arena Model Context Protocol (MCP) tools for Indian financial markets (NSE/BSE): live quotes, option chains with Greeks, instrument search, expiry dates, account tier details, and credit quota usage.",
+      "path": "skills/wealtharena-mcp/SKILL.md",
+      "aliases": ["wa-mcp", "wealtharena-mcp", "mcp-wealtharena"]
     }
   ]
 }
