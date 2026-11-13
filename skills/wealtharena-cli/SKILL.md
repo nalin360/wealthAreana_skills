@@ -1,6 +1,6 @@
 ---
 name: wealtharena-cli
-description: "Use the Wealth Arena CLI (wac/wa) for Indian financial markets (NSE/BSE): live quotes, Option Chain with Greeks, GEX gamma flips, algorithmic backtests, paper trading, and quota usage."
+description: "Use the Wealth Arena CLI (wac/wa) for Indian financial markets (NSE/BSE): live quotes, technical analysis, Option Chain with Greeks, GEX gamma flips, algorithmic backtests, paper trading, and quota usage."
 ---
 
 # Wealth Arena CLI (`wac` / `wa`) — Agent Operating Guide
@@ -69,16 +69,20 @@ wac chain snapshot --symbol NIFTY --strikes 10
 # 6. Specific Expiry Option Chain Snapshot
 wac chain snapshot --symbol NIFTY --expiry 2026-11-26 --strikes 10
 
-# 7. Historical Daily OHLCV Candle Bars
+# 7. Historical OHLCV Candle Bars (Daily or Intraday with Session Date)
 wac market history --symbol NSE:NIFTY50-INDEX --resolution 1D
+wac market history --symbol NSE:NIFTY50-INDEX --resolution 15 --date 2026-11-13
 
-# 8. Check Broker Connectivity (Fyers, Zerodha, INDmoney)
+# 8. Multi-Timeframe Technical & Regime Analysis
+wac analysis --symbol NSE:NIFTY50-INDEX --timeframe 15m
+
+# 9. Check Broker Connectivity (Fyers, Zerodha, INDmoney)
 wac broker status
 
-# 9. Paper Trading Capital Reset (₹10,00,000 default)
+# 10. Paper Trading Capital Reset (₹10,00,000 default)
 wac paper reset --capital 1000000
 
-# 10. View Canonical Catalog of Subscription Tiers & Capabilities
+# 11. View Canonical Catalog of Subscription Tiers & Capabilities
 wac plans
 ```
 

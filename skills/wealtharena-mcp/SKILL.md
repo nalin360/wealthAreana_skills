@@ -1,6 +1,6 @@
 ---
 name: wealtharena-mcp
-description: "Use Wealth Arena Model Context Protocol (MCP) tools for Indian financial markets (NSE/BSE): live quotes, option chains with Greeks, instrument search, expiry dates, account tier details, and credit quota usage."
+description: "Use Wealth Arena Model Context Protocol (MCP) tools for Indian financial markets (NSE/BSE): live quotes, historical OHLCV candlestick data, multi-timeframe technical analysis, option chains with Greeks, instrument search, expiry dates, account tier details, and credit quota usage."
 ---
 
 # Wealth Arena MCP Tools — Agent Operating Guide
@@ -23,8 +23,8 @@ The Wealth Arena Model Context Protocol (MCP) server provides autonomous AI agen
 3. **Compute Credit Economy & Quota Awareness**:
    - Wealth Arena accounts operate on tiered monthly compute credit quotas.
    - Control plane queries (liveness, session, quota, plan) are **0 credits** (free).
-   - Lightweight market lookups consume **1 credit**.
-   - Heavy analytical computations (full option chain snapshots with Greeks) consume **5 credits**.
+   - Lightweight market lookups and historical chart candles consume **1 credit** (`get_wa_market_quote`, `search_wa_instruments`, `get_wa_expiries`, `get_wa_historical_chart_data`).
+   - Heavy analytical computations consume **5 credits** (`get_wa_chain_snapshot`, `get_wa_technical_analysis`).
    - Proactively monitor remaining balance via `get_wa_usage_status` when running multi-step analyses.
 
 ---
@@ -39,7 +39,9 @@ The Wealth Arena Model Context Protocol (MCP) server provides autonomous AI agen
 | **`get_wa_market_quote`** | Real-time quote (LTP, change, volume, prev close) for a single instrument | **1 Credit** | `symbol` *(string)* | *None* |
 | **`search_wa_instruments`** | Search tradable stocks, indices, and derivatives by name or keyword | **1 Credit** | `query` *(string)* | `limit` *(int, default 10)* |
 | **`get_wa_expiries`** | Active option and futures expiry calendar for an underlying | **1 Credit** | `underlying` *(string)* | *None* |
+| **`get_wa_historical_chart_data`** | Historical or intraday OHLCV candlestick bars (1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 1D) with session range and volume | **1 Credit** | `symbol` *(string)* | `resolution` *(string, default "15m")*, `date` *(YYYY-MM-DD)*, `from` *(string)*, `to` *(string)*, `limit` *(int, max 300)* |
 | **`get_wa_chain_snapshot`** | High-density option chain with spot, strikes, OI, PCR, Max Pain, and Greeks (Delta, Gamma, Theta, Vega) | **5 Credits** | `symbol` *(string)* | `strikes` *(int, default 10)*, `expiry` *(YYYY-MM-DD)* |
+| **`get_wa_technical_analysis`** | Multi-timeframe technical indicator & regime breakdown: MA Consensus, Trend Horizons (EMA 9-200), Momentum (RSI/MACD/ROC), Swings, Pivots, Option Chain context | **5 Credits** | `symbol` *(string)* | `timeframe` *(string, default "15m")*, `date` *(YYYY-MM-DD)*, `include_option_chain` *(bool, default true)* |
 
 ### Feature-Gated Tools (Coming Soon)
 The following execution and risk management tools are currently gated behind backend feature flags (`kill:mcp-tool-*`) and return an honest Coming Soon indicator:
@@ -129,6 +131,36 @@ When a user refers to an ambiguous company or derivative:
 }
 ```
 Select the corresponding `NSE:TATAMOTORS-EQ` or derivative contract identifier.
+
+### Recipe 5: Intraday & Historical Candlestick Chart Data
+When a user asks for intraday candles or historical price action (e.g. "pull current date 15m candlestick data of NIFTY 50"):
+```json
+// Call get_wa_historical_chart_data
+{
+  "symbol": "NSE:NIFTY50-INDEX",
+  "resolution": "15m",
+  "date": "2026-11-13"
+}
+```
+*Output: Structured OHLCV Markdown table formatted with IST timestamps, Open, High, Low, Close, and Volume in Indian units (Cr, L, K), preceded by session summary metrics (Period, Session High/Low, Net Range).*
+
+### Recipe 6: Multi-Timeframe Technical & Regime Analysis
+When a user requests trend direction, moving averages, momentum indicators, or support/resistance pivots:
+```json
+// Call get_wa_technical_analysis
+{
+  "symbol": "NSE:NIFTY50-INDEX",
+  "timeframe": "15m",
+  "include_option_chain": true
+}
+```
+*Output: Comprehensive 6-section technical dossier covering:*
+1. **Consensus Verdict**: Aggregate Buy/Sell/Neutral counts across MAs and Oscillators.
+2. **Trend & Moving Averages**: Alignment across EMA 9, 21, 50, 200 plus full 12-row SMA/EMA table.
+3. **Momentum & Oscillators**: RSI value & zone, MACD stance/histogram, ROC velocity.
+4. **Market Regime & Price Action**: Volatility regime and confirmed swing highs/lows.
+5. **Pivot Points**: Classic, Fibonacci, and Camarilla S1-S3 / R1-R3 levels.
+6. **Option Chain Sentiment**: PCR, ATM strike, Max Call OI resistance, Max Put OI support.
 
 ---
 
