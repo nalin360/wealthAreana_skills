@@ -1,6 +1,6 @@
 ---
 name: wealtharena-mcp
-description: "Use Wealth Arena Model Context Protocol (MCP) tools for Indian financial markets (NSE/BSE): live quotes, historical OHLCV candlestick data, multi-timeframe technical analysis, option chains with Greeks, instrument search, expiry dates, account tier details, and credit quota usage."
+description: "Use Wealth Arena Model Context Protocol (MCP) tools for Indian financial markets (NSE/BSE): live quotes, historical OHLCV candlestick data, multi-timeframe technical analysis, institutional FII/DII/Pro/Client positioning & Volume Profile (POC/VAH/VAL), option chains with Greeks, instrument search, expiry dates, account tier details, and credit quota usage."
 ---
 
 # Wealth Arena MCP Tools — Agent Operating Guide
@@ -23,8 +23,8 @@ The Wealth Arena Model Context Protocol (MCP) server provides autonomous AI agen
 3. **Compute Credit Economy & Quota Awareness**:
    - Wealth Arena accounts operate on tiered monthly compute credit quotas.
    - Control plane queries (liveness, session, quota, plan) are **0 credits** (free).
-   - Lightweight market lookups and historical chart candles consume **1 credit** (`get_wa_market_quote`, `search_wa_instruments`, `get_wa_expiries`, `get_wa_historical_chart_data`).
-   - Heavy analytical computations consume **5 credits** (`get_wa_chain_snapshot`, `get_wa_technical_analysis`).
+   - Lightweight market lookups consume **1 credit** (`get_wa_market_quote`, `search_wa_instruments`, `get_wa_expiries`).
+   - Analytical & historical candlestick computations consume **5 credits** (`get_wa_chain_snapshot`, `get_wa_historical_chart_data`, `get_wa_technical_analysis`, `get_wa_institutional_positioning`).
    - Proactively monitor remaining balance via `get_wa_usage_status` when running multi-step analyses.
 
 ---
@@ -37,11 +37,12 @@ The Wealth Arena Model Context Protocol (MCP) server provides autonomous AI agen
 | **`get_wa_plan`** | Active subscription plan tier, monthly quota, and rate limits | **0 Credits** | *None* | *None* |
 | **`get_wa_usage_status`** | Current credit consumption, remaining balance, cycle renewal date, and daily pacing budget | **0 Credits** | *None* | *None* |
 | **`get_wa_market_quote`** | Real-time quote (LTP, change, volume, prev close) for a single instrument | **1 Credit** | `symbol` *(string)* | *None* |
-| **`search_wa_instruments`** | Search tradable stocks, indices, and derivatives by name or keyword | **1 Credit** | `query` *(string)* | `limit` *(int, default 10)* |
+| **`search_wa_instruments`** | Search tradable stocks, indices, and derivatives by name or keyword | **1 Credit** | `query` or `underlying` *(string)* | `instrument_type` *(exact: `EQ` \| `INDEX` \| `FUTIDX` \| `FUTSTK` \| `OPTIDX` \| `OPTSTK` \| `COMMODITY` \| `All`)*, `limit` *(int, default 15, max 50)* |
 | **`get_wa_expiries`** | Active option and futures expiry calendar for an underlying | **1 Credit** | `underlying` *(string)* | *None* |
-| **`get_wa_historical_chart_data`** | Historical or intraday OHLCV candlestick bars (1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 1D) with session range and volume | **1 Credit** | `symbol` *(string)* | `resolution` *(string, default "15m")*, `date` *(YYYY-MM-DD)*, `from` *(string)*, `to` *(string)*, `limit` *(int, max 300)* |
+| **`get_wa_historical_chart_data`** | Historical or intraday OHLCV candlestick bars (1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 1D) with session range and volume | **5 Credits** | `symbol` *(string)* | `resolution` *(string, default "15m")*, `date` *(YYYY-MM-DD, omit for latest session)*, `from` *(string)*, `to` *(string)*, `limit` *(int, max 300)* |
 | **`get_wa_chain_snapshot`** | High-density option chain with spot, strikes, OI, PCR, Max Pain, and Greeks (Delta, Gamma, Theta, Vega) | **5 Credits** | `symbol` *(string)* | `strikes` *(int, default 10)*, `expiry` *(YYYY-MM-DD)* |
 | **`get_wa_technical_analysis`** | Multi-timeframe technical indicator & regime breakdown: MA Consensus, Trend Horizons (EMA 9-200), Momentum (RSI/MACD/ROC), Swings, Pivots, Option Chain context | **5 Credits** | `symbol` *(string)* | `timeframe` *(string, default "15m")*, `date` *(YYYY-MM-DD)*, `include_option_chain` *(bool, default true)* |
+| **`get_wa_institutional_positioning`** | NSE institutional & participant derivatives positioning (FII/DII/Pro/Client OI, long/short ratios, cash flows, India VIX, F&O ban list), monthly leaderboard, participant time series, and intraday Volume Profile (POC/VAH/VAL) | **5 Credits** | *None* | `view` *(string: `"overview"` \| `"summary"` \| `"time_series"` \| `"leaderboard"` \| `"volume_profile"`)*, `date` *(YYYY-MM-DD or `"latest"`)*, `participant` *(`"FII"` \| `"DII"` \| `"PRO"` \| `"CLIENT"`)*, `month` *(YYYY-MM)*, `symbol` *(string, default `"NSE:NIFTY50-INDEX"`)*, `limit` *(int, max 60)* |
 
 ### Feature-Gated Tools (Coming Soon)
 The following execution and risk management tools are currently gated behind backend feature flags (`kill:mcp-tool-*`) and return an honest Coming Soon indicator:
@@ -59,7 +60,7 @@ Indian equity and derivatives markets follow strict identifier conventions:
 ### Index Underlyings
 Always use the broker-prefixed index identifier:
 - **NIFTY 50**: `"NSE:NIFTY50-INDEX"`
-- **BANK NIFTY**: `"NSE:BANKNIFTY-INDEX"`
+- **BANK NIFTY**: `"NSE:NIFTYBANK-INDEX"`
 - **FINNIFTY**: `"NSE:FINNIFTY-INDEX"`
 - **MIDCAP NIFTY**: `"NSE:MIDCPNIFTY-INDEX"`
 
@@ -133,9 +134,18 @@ When a user refers to an ambiguous company or derivative:
 Select the corresponding `NSE:TATAMOTORS-EQ` or derivative contract identifier.
 
 ### Recipe 5: Intraday & Historical Candlestick Chart Data
-When a user asks for intraday candles or historical price action (e.g. "pull current date 15m candlestick data of NIFTY 50"):
+When a user asks for the latest or recent intraday candles (especially on weekends, exchange holidays, or pre-open before 09:15 IST), **omit `date`** so the most recent completed trading session is returned automatically:
 ```json
-// Call get_wa_historical_chart_data
+// Call get_wa_historical_chart_data (latest completed session)
+{
+  "symbol": "NSE:NIFTY50-INDEX",
+  "resolution": "15m",
+  "limit": 50
+}
+```
+Pass `date: "YYYY-MM-DD"` only when targeting a specific calendar trading day (passing a Saturday, Sunday, or holiday date returns an honest empty-session notice):
+```json
+// Call get_wa_historical_chart_data (specific trading day)
 {
   "symbol": "NSE:NIFTY50-INDEX",
   "resolution": "15m",
@@ -162,6 +172,26 @@ When a user requests trend direction, moving averages, momentum indicators, or s
 5. **Pivot Points**: Classic, Fibonacci, and Camarilla S1-S3 / R1-R3 levels.
 6. **Option Chain Sentiment**: PCR, ATM strike, Max Call OI resistance, Max Put OI support.
 
+### Recipe 7: Institutional Positioning (FII/DII/Pro/Client OI) & Volume Profile (POC)
+When a user asks for FII/DII positioning, institutional derivatives OI, monthly smart-money leaderboard, or session Volume Profile (POC / Value Area):
+```json
+// Call get_wa_institutional_positioning (full overview)
+{
+  "view": "overview",
+  "symbol": "NSE:NIFTY50-INDEX"
+}
+```
+To inspect multi-session positioning trends for a specific participant (`FII`, `DII`, `PRO`, or `CLIENT`):
+```json
+// Call get_wa_institutional_positioning (participant time series)
+{
+  "view": "time_series",
+  "participant": "FII",
+  "limit": 15
+}
+```
+*Output: Token-dense GFM tables covering participant Index/Stock Futures & Call/Put OI, net long/short ratios, FII/DII cash flows (₹ Cr), India VIX, F&O ban list, monthly win-rate/bias leaderboard, and intraday Volume Profile (POC, VAH, VAL).*
+
 ---
 
 ## 5. Market Hours & Operating Boundaries
@@ -169,7 +199,7 @@ When a user requests trend direction, moving averages, momentum indicators, or s
 - **Regular Trading Hours**: Monday through Friday, **09:15 to 15:30 IST** (excluding exchange holidays).
 - **Pre-Open Market Session**: **09:00 to 09:15 IST**.
 - **Platform Operating Window**: **06:30 to 23:30 IST daily**.
-- **Off-Hours Queries**: During market off-hours or weekends, requests return the last finalized closing session prices and settled option chain data. The server notes off-market status honestly.
+- **Off-Hours Queries**: During market off-hours or weekends, queries without a weekend/holiday `date` filter return the last finalized closing session prices, candles, and settled option chain data. Explicit `date` queries for non-trading days report off-market status honestly with zero synthetic candles.
 
 ---
 

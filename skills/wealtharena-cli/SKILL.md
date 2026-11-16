@@ -38,7 +38,7 @@ Every authenticated API request consumes credits based on backend compute cost. 
 |:---|:---|:---|
 | **0 Credits** | Control Plane & Reachability | `wac conn` (alias `wac status`), `wac login`, `wac logout`, `wac usage`, `wac plans`, `wac flags list`, `wac skill` |
 | **1 Credit** | Lightweight Lookups | `wac market quote`, `wac market depth`, `wac me`, `wac broker status`, `wac market search` |
-| **5 Credits** | Analytical Compute | `wac chain snapshot`, `wac market history`, Pre-Open Gap analysis |
+| **5 Credits** | Analytical Compute | `wac chain snapshot`, `wac market history`, `wac analysis`, `wac institutional`, Pre-Open Gap analysis |
 | **10 Credits** | Bulk Analytics | Bulk multi-strike scans, Call vs Put OI time-series analysis |
 | **20 Credits** | High Compute Engine | Quantitative strategy backtesting runs (`wac backtest run`) |
 
@@ -63,18 +63,29 @@ wac market quote --symbol NSE:NIFTY50-INDEX
 # 4. Market Depth (5-Level Level 2 Orderbook)
 wac market depth --symbol NSE:RELIANCE-EQ
 
+# 4b. Search Instruments (exact --type: EQ | INDEX | FUTIDX | FUTSTK | OPTIDX | OPTSTK | COMMODITY | All)
+wac market search --query RELIANCE --type EQ --limit 10
+wac market search --underlying NIFTY --type OPTIDX --limit 20
+
 # 5. Live Option Chain with Greeks (10 strikes around ATM)
 wac chain snapshot --symbol NIFTY --strikes 10
 
 # 6. Specific Expiry Option Chain Snapshot
 wac chain snapshot --symbol NIFTY --expiry 2026-11-26 --strikes 10
 
-# 7. Historical OHLCV Candle Bars (Daily or Intraday with Session Date)
-wac market history --symbol NSE:NIFTY50-INDEX --resolution 1D
-wac market history --symbol NSE:NIFTY50-INDEX --resolution 15 --date 2026-11-13
+# 7. Historical OHLCV Candle Bars (Omit --date for latest session incl. weekends/off-hours)
+wac market history --symbol NSE:NIFTY50-INDEX --resolution 15m --limit 50
+wac market history --symbol NSE:NIFTY50-INDEX --resolution 15m --date 2026-11-13
 
 # 8. Multi-Timeframe Technical & Regime Analysis
 wac analysis --symbol NSE:NIFTY50-INDEX --timeframe 15m
+
+# 8b. Institutional Positioning & Session Volume Profile (POC / VAH / VAL)
+wac institutional overview --symbol NSE:NIFTY50-INDEX
+wac institutional summary --date 2026-11-13
+wac institutional timeseries --participant FII --limit 15
+wac institutional leaderboard --month 2026-11
+wac institutional volume-profile --symbol NSE:NIFTY50-INDEX
 
 # 9. Check Broker Connectivity (Fyers, Zerodha, INDmoney)
 wac broker status
