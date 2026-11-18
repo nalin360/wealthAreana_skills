@@ -1,6 +1,6 @@
 ---
 name: wealtharena-cli
-description: "Use the Wealth Arena CLI (wac/wa) for Indian financial markets (NSE/BSE): live quotes, technical analysis, Option Chain with Greeks, GEX gamma flips, algorithmic backtests, paper trading, and quota usage."
+description: "Use the Wealth Arena CLI (wac/wa) for Indian financial markets (NSE/BSE): live quotes, technical analysis, Option Chain with Greeks & historical replay, Call vs Put OI buildup, GEX gamma flips, algorithmic backtests, paper trading, and quota usage."
 ---
 
 # Wealth Arena CLI (`wac` / `wa`) — Agent Operating Guide
@@ -38,8 +38,8 @@ Every authenticated API request consumes credits based on backend compute cost. 
 |:---|:---|:---|
 | **0 Credits** | Control Plane & Reachability | `wac conn` (alias `wac status`), `wac login`, `wac logout`, `wac usage`, `wac plans`, `wac flags list`, `wac skill` |
 | **1 Credit** | Lightweight Lookups | `wac market quote`, `wac market depth`, `wac me`, `wac broker status`, `wac market search` |
-| **5 Credits** | Analytical Compute | `wac chain snapshot`, `wac market history`, `wac analysis`, `wac institutional`, Pre-Open Gap analysis |
-| **10 Credits** | Bulk Analytics | Bulk multi-strike scans, Call vs Put OI time-series analysis |
+| **5 Credits** | Analytical Compute | `wac chain snapshot` (live or `--date` replay), `wac market history`, `wac analysis`, `wac institutional`, Pre-Open Gap analysis |
+| **10 Credits** | Bulk Analytics | Bulk multi-strike scans, `wac oi-buildup` Call vs Put OI windows, OI time-series analysis |
 | **20 Credits** | High Compute Engine | Quantitative strategy backtesting runs (`wac backtest run`) |
 
 ---
@@ -72,6 +72,13 @@ wac chain snapshot --symbol NIFTY --strikes 10
 
 # 6. Specific Expiry Option Chain Snapshot
 wac chain snapshot --symbol NIFTY --expiry 2026-11-26 --strikes 10
+
+# 6b. Stored Historical Chain Replay (point-in-time; --time defaults to 15:30 IST)
+wac chain snapshot --symbol NIFTY --date 2026-11-18 --time 14:45 --strikes 10
+
+# 6c. Call vs Put OI Buildup (10 credits; omit --date to resolve the latest stored session)
+wac oi-buildup --symbol NIFTY --timeframe 15m --limit 10
+wac oi-buildup --symbol NIFTY --timeframe 3m --date 2026-11-18 --range-start 24000 --range-end 24500
 
 # 7. Historical OHLCV Candle Bars (Omit --date for latest session incl. weekends/off-hours)
 wac market history --symbol NSE:NIFTY50-INDEX --resolution 15m --limit 50

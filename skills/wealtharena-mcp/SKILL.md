@@ -1,6 +1,6 @@
 ---
 name: wealtharena-mcp
-description: "Use Wealth Arena Model Context Protocol (MCP) tools for Indian financial markets (NSE/BSE): live quotes, historical OHLCV candlestick data, multi-timeframe technical analysis, institutional FII/DII/Pro/Client positioning & Volume Profile (POC/VAH/VAL), option chains with Greeks, instrument search, expiry dates, account tier details, and credit quota usage."
+description: "Use Wealth Arena Model Context Protocol (MCP) tools for Indian financial markets (NSE/BSE): live quotes, historical OHLCV candlestick data, multi-timeframe technical analysis, institutional FII/DII/Pro/Client positioning & Volume Profile (POC/VAH/VAL), option chains with Greeks and historical replay, Call vs Put OI buildup, instrument search, expiry dates, account tier details, and credit quota usage."
 ---
 
 # Wealth Arena MCP Tools — Agent Operating Guide
@@ -25,6 +25,7 @@ The Wealth Arena Model Context Protocol (MCP) server provides autonomous AI agen
    - Control plane queries (liveness, session, quota, plan) are **0 credits** (free).
    - Lightweight market lookups consume **1 credit** (`get_wa_market_quote`, `search_wa_instruments`, `get_wa_expiries`).
    - Analytical & historical candlestick computations consume **5 credits** (`get_wa_chain_snapshot`, `get_wa_historical_chart_data`, `get_wa_technical_analysis`, `get_wa_institutional_positioning`).
+   - Bulk Call vs Put OI rollups consume **10 credits** (`get_wa_oi_buildup`).
    - Proactively monitor remaining balance via `get_wa_usage_status` when running multi-step analyses.
 
 ---
@@ -40,7 +41,8 @@ The Wealth Arena Model Context Protocol (MCP) server provides autonomous AI agen
 | **`search_wa_instruments`** | Search tradable stocks, indices, and derivatives by name or keyword | **1 Credit** | `query` or `underlying` *(string)* | `instrument_type` *(exact: `EQ` \| `INDEX` \| `FUTIDX` \| `FUTSTK` \| `OPTIDX` \| `OPTSTK` \| `COMMODITY` \| `All`)*, `limit` *(int, default 15, max 50)* |
 | **`get_wa_expiries`** | Active option and futures expiry calendar for an underlying | **1 Credit** | `underlying` *(string)* | *None* |
 | **`get_wa_historical_chart_data`** | Historical or intraday OHLCV candlestick bars (1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 1D) with session range and volume | **5 Credits** | `symbol` *(string)* | `resolution` *(string, default "15m")*, `date` *(YYYY-MM-DD, omit for latest session)*, `from` *(string)*, `to` *(string)*, `limit` *(int, max 300)* |
-| **`get_wa_chain_snapshot`** | High-density option chain with spot, strikes, OI, PCR, Max Pain, and Greeks (Delta, Gamma, Theta, Vega) | **5 Credits** | `symbol` *(string)* | `strikes` *(int, default 10)*, `expiry` *(YYYY-MM-DD)* |
+| **`get_wa_chain_snapshot`** | High-density option chain with spot, strikes, OI, PCR, Max Pain, and Greeks (Delta, Gamma, Theta, Vega); pass `date`/`time` to replay a stored historical chain | **5 Credits** | `symbol` *(string)* | `strikes` *(int, default 10)*, `expiry` *(YYYY-MM-DD)*, `date` *(YYYY-MM-DD, omit for live chain)*, `time` *(HH:MM IST, default "15:30")* |
+| **`get_wa_oi_buildup`** | Call vs Put Open Interest buildup from stored snapshots: CE/PE OI, PCR, window deltas, and prior-session settlement change across 1m–1h rollups | **10 Credits** | `symbol` *(string)* | `timeframe` *("1m" \| "3m" \| "5m" \| "15m" \| "30m" \| "1h", default "15m")*, `date` *(YYYY-MM-DD, omit for latest stored session)*, `expiry` *(YYYY-MM-DD)*, `from` *(HHMM, default "0915")*, `to` *(HHMM, default "1530")*, `range_start` *(number)*, `range_end` *(number)*, `limit` *(int, default 20, max 100)* |
 | **`get_wa_technical_analysis`** | Multi-timeframe technical indicator & regime breakdown: MA Consensus, Trend Horizons (EMA 9-200), Momentum (RSI/MACD/ROC), Swings, Pivots, Option Chain context | **5 Credits** | `symbol` *(string)* | `timeframe` *(string, default "15m")*, `date` *(YYYY-MM-DD)*, `include_option_chain` *(bool, default true)* |
 | **`get_wa_institutional_positioning`** | NSE institutional & participant derivatives positioning (FII/DII/Pro/Client OI, long/short ratios, cash flows, India VIX, F&O ban list), monthly leaderboard, participant time series, and intraday Volume Profile (POC/VAH/VAL) | **5 Credits** | *None* | `view` *(string: `"overview"` \| `"summary"` \| `"time_series"` \| `"leaderboard"` \| `"volume_profile"`)*, `date` *(YYYY-MM-DD or `"latest"`)*, `participant` *(`"FII"` \| `"DII"` \| `"PRO"` \| `"CLIENT"`)*, `month` *(YYYY-MM)*, `symbol` *(string, default `"NSE:NIFTY50-INDEX"`)*, `limit` *(int, max 60)* |
 
@@ -191,6 +193,33 @@ To inspect multi-session positioning trends for a specific participant (`FII`, `
 }
 ```
 *Output: Token-dense GFM tables covering participant Index/Stock Futures & Call/Put OI, net long/short ratios, FII/DII cash flows (₹ Cr), India VIX, F&O ban list, monthly win-rate/bias leaderboard, and intraday Volume Profile (POC, VAH, VAL).*
+
+### Recipe 8: Call vs Put OI Buildup (Intraday & Historical)
+When a user asks where call/put writers are building or unwinding open interest, asks for PCR trend across the session, or wants window-on-window OI deltas:
+```json
+// Call get_wa_oi_buildup (latest stored session, 15-minute windows)
+{
+  "symbol": "NSE:NIFTY50-INDEX",
+  "timeframe": "15m",
+  "limit": 20
+}
+```
+**Omit `date`** on weekends, exchange holidays, or pre-open (before 09:15 IST) so the most recent stored trading session resolves automatically. Pass `date: "YYYY-MM-DD"` only for a specific session — a Saturday or holiday returns an honest empty-session notice rather than synthetic rows. Narrow the read with `expiry`, `from`/`to` (HHMM IST) or a strike range:
+```json
+// Call get_wa_oi_buildup (3-minute windows, bounded strike range)
+{
+  "symbol": "NIFTY",
+  "timeframe": "3m",
+  "date": "2026-11-18",
+  "from": "0915",
+  "to": "1200",
+  "range_start": 24000,
+  "range_end": 24500
+}
+```
+*Output: session summary (date, window, expiry, strike range, latest PCR/OI/sentiment) followed by a chronological table of rolled windows: CE OI, PE OI, CE ΔOI, PE ΔOI, PCR, OI gap, volume, and sentiment.*
+
+For an exact point-in-time chain instead of rolled windows, call `get_wa_chain_snapshot(symbol: "NIFTY", date: "2026-11-18", time: "14:45")` — omitting `date` always returns the live broker chain.
 
 ---
 
